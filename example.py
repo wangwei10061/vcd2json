@@ -11,11 +11,11 @@ def example1():
     extractor.print_props()
 
 
-if __name__ == '__main__':
-    print('')
-    print('Example 1')
-    print('----------------------------------------')
-    example1()
+# if __name__ == '__main__':
+#     print('')
+#     print('Example 1')
+#     print('----------------------------------------')
+#     example1()
 
     # Example 1
     # ----------------------------------------
@@ -38,11 +38,14 @@ def example2():
     """Extract the signal values specified in the path list
        and output WaveJSON string to the file."""
 
-    path_list = ['tb_timer/u_timer/clock',
-                 'tb_timer/u_timer/reset',
-                 'tb_timer/u_timer/pulse',
+    path_list = ['tb_timer/clock',
+                 'tb_timer/pulse',
+                 'tb_timer/reset',
+                 'tb_timer/u_timer/clock',
+                 'tb_timer/u_timer/count',
                  'tb_timer/u_timer/count_eq11',
-                 'tb_timer/u_timer/count']
+                 'tb_timer/u_timer/pulse',
+                 'tb_timer/u_timer/reset']
 
     extractor = WaveExtractor('timer.vcd', 'timer.json', path_list)
     extractor.execute()
@@ -89,12 +92,12 @@ def example3():
     extractor.execute()
 
 
-if __name__ == '__main__':
-    print('')
-    print('')
-    print('Example 3')
-    print('----------------------------------------')
-    example3()
+# if __name__ == '__main__':
+#     print('')
+#     print('')
+#     print('Example 3')
+#     print('----------------------------------------')
+#     example3()
 
     # Example 3
     # ----------------------------------------

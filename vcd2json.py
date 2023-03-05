@@ -1,4 +1,5 @@
 """Create WaveJSON text string from VCD file."""
+import copy
 import sys
 
 
@@ -160,11 +161,16 @@ class WaveExtractor:
             fout = open(self._json_file, 'wt')
         fout.write(jsongen.create_header())
 
+        origin_list = []
+        sample_dict_list = []
         while True:
             origin = sampler.run(fin, clock_id, value_dict, sample_dict)
             if len(sample_dict[clock_id]) == 0:
                 break
-            fout.write(jsongen.create_body(origin, sample_dict))
+            origin_list += [origin]
+            sample_dict_list.append(copy.deepcopy(sample_dict))
+        fout.write(jsongen.create_body_list(origin_list, sample_dict_list))
+
 
         fout.write(jsongen.create_footer())
         fin.close()
@@ -244,7 +250,7 @@ class _JsonGenerator():
         wave = '"{0}"'.format('p' + '.' * (self._wave_chunk - 1))
         json =  '{ "head": {"tock":1},\n'
         json += '  "signal": [\n'
-        json += '  {   "name": '+name+', "wave": '+wave+' }'
+        # json += '  {   "name": '+name+', "wave": '+wave+' }'
         return json
 
     def create_body(self, origin, sample_dict):
@@ -292,24 +298,101 @@ class _JsonGenerator():
                 fmt = '0' + str((length+3)//4) + 'x'
             return format(value, fmt)
 
-        json =  ',\n'
-        json += '  {},\n'
-        json += '  ["{0}"'.format(origin)
+        json =  ''
+        # json += '  {},\n'
+        json += '  ['
         for path in self._path_list[1:]:
-            name   = self._path_dict[path]._name
+            name   = path
             sid    = self._path_dict[path]._sid
             length = self._path_dict[path]._length
             if length == 1:
                 name = '"{0}"'.format(name).ljust(self._name_width + 2)
                 wave = create_wave(sample_dict[sid])
-                json += ',\n    { "name": '+name+', "wave": '+wave+' }'
+                json += '\n    { "name": '+name+', "wave": '+wave+' },'
             else:
                 fmt = self._path_dict[path]._fmt
                 name = '"{0}"'.format(name).ljust(self._name_width + 2)
                 wave, data = create_wave_data(sample_dict[sid], length, fmt)
-                json += ',\n    { "name": '+name+', "wave": '+wave+\
-                                                 ', "data": '+data+' }'
+                json += '\n    { "name": '+name+', "wave": '+wave+\
+                                                 ', "data": '+data+' },'
+        json = json[:-1]
         json += '\n  ]'
+        return json
+
+    def create_body_list(self, origin_list, sample_dict_list):
+
+        def create_wave(samples):
+            prev = None
+            wave = ''
+            for value in samples:
+                if value == prev:
+                    wave += '.'
+                else:
+                    wave += value
+                prev = value
+            return '"'+wave+'"'
+
+        def create_wave_data(samples, length, fmt):
+            prev = None
+            wave = ''
+            data = ''
+            for value in samples:
+                if value == prev:
+                    wave += '.'
+                elif all([c == '0' or c == '1' for c in value]):
+                    wave += '='
+                    data += ' ' + data_format(value, length, fmt)
+                elif all([c == 'z' for c in value]):
+                    wave += 'z'
+                else:
+                    wave += 'x'
+                prev = value
+            return '"'+wave+'"', '"'+data[1:]+'"'
+
+        def data_format(value, length, fmt):
+            value = int(value, 2)
+            if fmt == 'b':
+                fmt = '0' + str(length) + 'b'
+            elif fmt == 'd':
+                if value >= 2**(length-1):
+                    value -= 2**length
+            elif fmt == 'u':
+                fmt = 'd'
+            elif fmt == 'X':
+                fmt = '0' + str((length+3)//4) + 'X'
+            else:
+                fmt = '0' + str((length+3)//4) + 'x'
+            return format(value, fmt)
+
+        # json =  ',\n'
+        # json += '  {},\n'
+        json = '  '
+        for path in self._path_list[1:]:
+            name   = path
+            sid    = self._path_dict[path]._sid
+            length = self._path_dict[path]._length
+            if length == 1:
+                wave_str = ""
+                name = '"{0}"'.format(name).ljust(self._name_width + 2)
+                json += '\n    { "name": ' + name
+                for sample_dict in sample_dict_list:
+                    wave = create_wave(sample_dict[sid])
+                    wave_str += wave[1:-1]
+                json += ', "wave": "' + wave_str + '" },'
+            else:
+                fmt = self._path_dict[path]._fmt
+                wave_str = ""
+                data_str = ""
+                name = '"{0}"'.format(name).ljust(self._name_width + 2)
+                json += '\n    { "name": ' + name
+                for sample_dict in sample_dict_list:
+                    wave, data = create_wave_data(sample_dict[sid], length, fmt)
+                    wave_str += wave[1:-1]
+                    data_str += " " + data[1:-1]
+                json += ', "wave": "' + wave_str + \
+                        '", "data": "' + data_str + '" },'
+        json = json[:-1]
+        json += '\n  '
         return json
 
     def create_footer(self):
